@@ -28,6 +28,14 @@ function M.new(win, view)
   local wo = vim.tbl_deep_extend("force", {}, Config.wo, view.edgebar.wo or {}, view.wo or {})
   self.wo = wo
 
+  if Config.mouse_resize and Config.mouse_resize.enabled then
+    -- keep Vim's automatic window equalization from touching edgebar
+    -- windows, so any WinResized we see can be trusted as an explicit
+    -- resize (mouse drag, :resize, <c-w>) rather than incidental rebalancing
+    wo.winfixwidth = true
+    wo.winfixheight = true
+  end
+
   if wo.winbar == true then
     if vim.api.nvim_win_get_height(win) == 1 then
       vim.api.nvim_win_set_height(win, 2)

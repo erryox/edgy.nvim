@@ -22,6 +22,7 @@ local Window = require("edgy.window")
 ---@field get_title fun():string
 ---@field wins Edgy.Window[]
 ---@field size Edgy.Size
+---@field default_size Edgy.Size
 ---@field pinned_win? Edgy.Window
 ---@field edgebar Edgy.Edgebar
 ---@field opening boolean
@@ -41,6 +42,7 @@ function M.new(opts, edgebar)
     return self.title
   end
   self.size = self.size or {}
+  self.default_size = vim.deepcopy(self.size)
   self.opening = false
   return self
 end

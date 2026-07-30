@@ -41,6 +41,14 @@ local defaults = {
   -- close edgy when all windows are hidden instead of opening one of them
   -- disable to always keep at least one edgy split visible in each open section
   close_when_all_hidden = true,
+  -- Allow persisting window sizes changed externally (e.g. by dragging a
+  -- border with the mouse, or explicit `:resize`/<c-w> commands) instead of
+  -- always snapping back to the configured size.
+  -- Off by default: detection is a heuristic (see the Limitations section
+  -- in the README).
+  mouse_resize = {
+    enabled = false,
+  },
   -- global window options for edgebar windows
   ---@type vim.wo
   wo = {

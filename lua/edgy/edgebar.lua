@@ -1,3 +1,4 @@
+local Config = require("edgy.config")
 local Editor = require("edgy.editor")
 local Util = require("edgy.util")
 local View = require("edgy.view")
@@ -18,7 +19,8 @@ local wincmds = {
 ---@field pos Edgy.Pos
 ---@field views Edgy.View[]
 ---@field wins Edgy.Window[]
----@field size integer
+---@field size integer|fun():integer
+---@field default_size integer|fun():integer
 ---@field vertical boolean
 ---@field wo? vim.wo
 ---@field dirty boolean
@@ -50,6 +52,7 @@ function M.new(pos, opts)
   self.pos = pos
   self.views = {}
   self.size = opts.size or vertical and 30 or 10
+  self.default_size = self.size
   self.vertical = vertical
   self.wins = {}
   self.visible = 0
@@ -222,6 +225,86 @@ function M:layout()
   self.dirty = false
 end
 
+local size_getter = {
+  width = vim.api.nvim_win_get_width,
+  height = vim.api.nvim_win_get_height,
+}
+
+-- Detect windows whose size was changed externally (mouse drag, `:resize`,
+-- `<c-w>` builtin commands, ...) since the last resize pass, and persist
+-- that as a manual override instead of snapping it back to the computed
+-- target. Only trusted when the layout is stable and no animation is
+-- running, so transient/incidental size changes (relayout in progress,
+-- terminal resize) are never misread as an explicit user resize.
+---@param needs_layout boolean
+function M:detect_external_resize(needs_layout)
+  if not (Config.mouse_resize and Config.mouse_resize.enabled) then
+    return
+  end
+  if needs_layout or require("edgy.animate").is_active() then
+    return
+  end
+  if #self.wins == 0 then
+    return
+  end
+
+  local long = self.vertical and "height" or "width"
+  local short = self.vertical and "width" or "height"
+
+  ---@param win Edgy.Window
+  local function eligible(win)
+    -- terminal buffers are not excluded: a terminal's PTY reacts to the
+    -- window size, it never drives it, so there is no extra size-churn
+    -- risk here compared to any other buffer
+    return win.visible
+      and win:is_valid()
+      and not win:is_pinned()
+      and vim.api.nvim_win_get_config(win.win).relative == ""
+  end
+
+  ---@type Edgy.Window[]
+  local eligible_wins = {}
+
+  for _, win in ipairs(self.wins) do
+    if eligible(win) then
+      eligible_wins[#eligible_wins + 1] = win
+      if win[long] ~= nil then
+        local actual = size_getter[long](win.win)
+        if actual ~= win[long] then
+          vim.w[win.win]["edgy_" .. long] = actual
+          -- also persist on the view itself (not just the window): a
+          -- `vim.w` override dies with the window it's attached to, so
+          -- without this, closing and reopening the view (a new window)
+          -- would forget a resize that shrank it below the configured
+          -- size, since only growing past it could still win via
+          -- Edgebar:resize()'s math.max() against the original config
+          win.view.size[long] = actual
+        end
+      end
+    end
+  end
+
+  -- border between the edgebar and the main editor: only persist when
+  -- `size` is a plain number, since a user-supplied function must keep
+  -- being recomputed on its own terms. All windows in the bar share this
+  -- dimension; sample it from the first eligible window, so
+  -- pinned/floating windows never influence it.
+  if type(self.size) == "number" and eligible_wins[1] then
+    local actual = size_getter[short](eligible_wins[1].win)
+    if actual ~= self.bounds[short] then
+      self.size = actual
+      -- a per-view `size` acts as a floor via math.max() in Edgebar:resize(),
+      -- which would otherwise silently clamp the drag back up; override it
+      -- on every eligible window (and its view, so it survives that
+      -- window being closed and reopened) so the explicit resize wins
+      for _, win in ipairs(eligible_wins) do
+        vim.w[win.win]["edgy_" .. short] = actual
+        win.view.size[short] = actual
+      end
+    end
+  end
+end
+
 function M:resize()
   if #self.wins == 0 then
     return
@@ -317,6 +400,10 @@ function M:open()
 end
 
 function M:equalize()
+  self.size = self.default_size
+  for _, view in ipairs(self.views) do
+    view.size = vim.deepcopy(view.default_size)
+  end
   for _, win in ipairs(self.wins) do
     vim.w[win.win].edgy_width = nil
     vim.w[win.win].edgy_height = nil
