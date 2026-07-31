@@ -30,8 +30,8 @@ function M.new(win, view)
 
   if Config.mouse_resize and Config.mouse_resize.enabled then
     -- keep Vim's automatic window equalization from touching edgebar
-    -- windows, so any WinResized we see can be trusted as an explicit
-    -- resize (mouse drag, :resize, <c-w>) rather than incidental rebalancing
+    -- windows, so a size change caught during a mouse drag reflects the
+    -- drag itself rather than incidental rebalancing
     wo.winfixwidth = true
     wo.winfixheight = true
   end

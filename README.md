@@ -25,10 +25,10 @@ bringing a new edge to your workflow.
   It's tricky to detect if a window was resized by the user or by a plugin.
   Check the config section about `keys`. Regular window keymaps have been added
   for resizing windows. Alternatively, set `mouse_resize.enabled = true` to
-  persist window sizes changed externally (e.g. by dragging a border with
-  the mouse, or `:resize`). This is a heuristic and off by default: it can't
-  perfectly distinguish a deliberate resize from another plugin resizing a
-  window directly through the Neovim API.
+  persist window sizes changed by dragging a border with the mouse. This
+  only takes effect for actual mouse drags (detected via `vim.on_key()`),
+  not typed `:resize` commands, so it can't be fooled by unrelated windows
+  opening/closing or the editor being resized.
 - requires **Neovim >= 0.9.2** or **Neovim >= 0.10.0 (after June 5, 2023)**
   for proper folding. If you're on an older nightly, you can set `fix_win_height`
   to `true` to make it work.
@@ -104,10 +104,9 @@ vim.opt.splitkeep = "screen"
   -- close edgy when all windows are hidden instead of opening one of them
   -- disable to always keep at least one edgy split visible in each open section
   close_when_all_hidden = true,
-  -- Allow persisting window sizes changed externally (e.g. by dragging a
-  -- border with the mouse, or explicit `:resize`/<c-w> commands) instead of
-  -- always snapping back to the configured size.
-  -- Off by default: detection is a heuristic (see the Limitations section).
+  -- Allow persisting window sizes changed by dragging a border with the
+  -- mouse, instead of always snapping back to the configured size.
+  -- Off by default (see the Limitations section).
   mouse_resize = {
     enabled = false,
   },

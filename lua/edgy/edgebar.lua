@@ -230,18 +230,21 @@ local size_getter = {
   height = vim.api.nvim_win_get_height,
 }
 
--- Detect windows whose size was changed externally (mouse drag, `:resize`,
--- `<c-w>` builtin commands, ...) since the last resize pass, and persist
--- that as a manual override instead of snapping it back to the computed
--- target. Only trusted when the layout is stable and no animation is
--- running, so transient/incidental size changes (relayout in progress,
--- terminal resize) are never misread as an explicit user resize.
----@param needs_layout boolean
-function M:detect_external_resize(needs_layout)
+-- Detect windows whose size was changed by a mouse drag since the last
+-- resize pass, and persist that as a manual override instead of snapping
+-- it back to the computed target. `skip` is true when the change can't be
+-- trusted: mid-relayout (positions not settled yet), an animation is
+-- running, or -- most importantly -- no mouse drag was actually observed
+-- (see lua/edgy/mouse.lua), since Nvim's WinResized fires identically
+-- whether a window was resized by the user or by anything else (Vim's own
+-- rebalancing, another plugin opening/closing windows, a terminal
+-- resize).
+---@param skip boolean
+function M:detect_external_resize(skip)
   if not (Config.mouse_resize and Config.mouse_resize.enabled) then
     return
   end
-  if needs_layout or require("edgy.animate").is_active() then
+  if skip or require("edgy.animate").is_active() then
     return
   end
   if #self.wins == 0 then

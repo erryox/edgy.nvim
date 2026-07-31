@@ -41,11 +41,9 @@ local defaults = {
   -- close edgy when all windows are hidden instead of opening one of them
   -- disable to always keep at least one edgy split visible in each open section
   close_when_all_hidden = true,
-  -- Allow persisting window sizes changed externally (e.g. by dragging a
-  -- border with the mouse, or explicit `:resize`/<c-w> commands) instead of
-  -- always snapping back to the configured size.
-  -- Off by default: detection is a heuristic (see the Limitations section
-  -- in the README).
+  -- Allow persisting window sizes changed by dragging a border with the
+  -- mouse, instead of always snapping back to the configured size.
+  -- Off by default (see the Limitations section in the README).
   mouse_resize = {
     enabled = false,
   },
@@ -150,6 +148,10 @@ function M.setup(opts)
 
   if options.fix_win_height then
     require("edgy.hacks").setup()
+  end
+
+  if options.mouse_resize and options.mouse_resize.enabled then
+    require("edgy.mouse").setup()
   end
 
   vim.api.nvim_set_hl(0, "EdgyIcon", { default = true, link = "SignColumn" })

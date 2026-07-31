@@ -126,44 +126,12 @@ local function update()
   return changed
 end
 
----@type {columns: number, lines: number}?
-local last_size
-
--- Whether the editor's own size (terminal/GUI resize) changed since the
--- last layout pass.
-local function editor_resized()
-  local size = { columns = vim.o.columns, lines = vim.o.lines }
-  local resized = last_size ~= nil and not vim.deep_equal(size, last_size)
-  last_size = size
-  return resized
-end
-
-local uv = vim.uv or vim.loop
-
--- Guard window for the mouse_resize external-resize detector: an editor
--- resize, or a window entering/leaving an edgebar (which changes how much
--- space is left for every other edgebar, e.g. opening a right sidebar
--- shrinks the bottom bar's width), can take more than one layout pass to
--- fully settle into the newly recomputed sizes, and edgy's own corrective
--- passes don't necessarily trigger a further WinResized (they run with
--- autocmds suppressed) to signal "now it's stable". Rather than wait for
--- a pass that reports nothing left to resize -- which may never happen on
--- its own -- window-size drift is treated as expected (not a manual
--- resize) for a short, bounded window after the change, guaranteeing
--- detection always recovers instead of getting stuck.
-local SETTLE_MS = 200
-local settling_until = 0
-
 ---@param opts? {full: boolean}
 function M.layout(opts)
   opts = opts or {}
 
   local changed = update()
   local needs_layout = M.needs_layout()
-  if changed or editor_resized() then
-    settling_until = uv.now() + SETTLE_MS
-  end
-  local settling = uv.now() < settling_until
 
   if opts.full and not (changed or needs_layout) then
     return false
@@ -180,8 +148,16 @@ function M.layout(opts)
 
   local updated = false
 
+  -- A window-size change is only trusted as a deliberate resize (and
+  -- persisted) while a mouse drag was recently observed (see
+  -- lua/edgy/mouse.lua). Without that, a WinResized firing for any other
+  -- reason -- Vim's own automatic rebalancing, a plugin opening/closing
+  -- windows elsewhere, a terminal resize -- looks identical to a manual
+  -- resize, since Nvim doesn't report why a window was resized.
+  local dragging = require("edgy.mouse").is_dragging()
+
   M.foreach({ "left", "right", "bottom", "top" }, function(edgebar)
-    edgebar:detect_external_resize(needs_layout or settling)
+    edgebar:detect_external_resize(needs_layout or not dragging)
     if edgebar:resize() then
       if not updated then
         State.save()
